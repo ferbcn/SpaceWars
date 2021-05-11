@@ -19,8 +19,13 @@ RED = (255,0,0)
 YELLOW = (200,200,10)
 
 FIRE0 = pygame.image.load('images/fire-xs-0.png')
-ALIEN0 = pygame.image.load('images/alien1d.png')
-ALIEN1 = pygame.image.load('images/alien1e.png')
+ALIEN0 = pygame.image.load('images/spaceship0.png')
+ALIEN1 = pygame.image.load('images/spaceship1.png')
+
+SPLASH = pygame.image.load('images/blood-xs.png')
+SPLASH0 = pygame.transform.scale(SPLASH, (100, 100))
+CRACK = pygame.image.load('images/crack.png')
+CRACK0 = pygame.transform.scale(CRACK, (100, 100))
 
 
 class SpaceWars:
@@ -101,7 +106,8 @@ class SpaceWars:
 
         self.explosions = pygame.sprite.Group()
 
-        
+        self.overlays = pygame.sprite.Group()
+
 
     def runLoop(self):
 
@@ -110,6 +116,7 @@ class SpaceWars:
 
             # Game Over screen and event handling
             if self.game_over:
+                time.sleep(2)
                 self.game_over_screen()
                 while self.game_over:
                     for event in pygame.event.get():
@@ -261,26 +268,29 @@ class SpaceWars:
                     self.anim_run = False
                     print("Game Over!")
 
-                # Collision detection
+                # UPDATE objects
+                self.background_stars.update(self.myship.is_vertical_breaking, self.myship.is_horizontal_breaking)
+                self.flying_bg_stars.update()
+                self.enemy_objects.update(self.myship.rect, self.window)
+                self.rockets.update()
+                self.explosions.update()
+                self.overlays.update()
+
+                # COLLISION DETECTION
                 for enemy in self.enemy_objects:
                     for rocket in self.rockets:
                         if enemy.rect.colliderect(rocket.rect):
                             for i in range(int(enemy.size/4)):
                                 explosion = Explosion(enemy.rect.x, enemy.rect.y, enemy.color)
                                 self.explosions.add(explosion)
+                            if enemy.distance <= 100:
+                                splash = Splash(enemy.rect.x, enemy.rect.y, enemy.size)
+                                self.overlays.add(splash)
                             self.enemy_objects.remove(enemy)
                             self.enemy_objects.add(EnemyObject())
                             self.score += 100
                             rocket.remove(self.rockets)
 
-                # Update objects
-                self.background_stars.update(self.myship.is_vertical_breaking, self.myship.is_horizontal_breaking)
-                self.flying_bg_stars.update()
-                self.enemy_objects.update(self.myship.rect, self.window)
-                self.rockets.update()
-                self.explosions.update()
-
-                # Collision detection and object removal
                 for rocket in self.rockets:
                     if rocket.life < 1 or rocket.rect.y < WINDOWHEIGHT/2:
                         self.rockets.remove(rocket)
@@ -293,6 +303,8 @@ class SpaceWars:
                             self.lifes -= 1
                             self.enemy_objects.remove(enemy)
                             self.enemy_objects.add(EnemyObject())
+                            crack = Crack(enemy.rect.x, enemy.rect.y)
+                            self.overlays.add(crack)
                         else:
                             enemy.set_fly_by_mode()
                     if enemy.distance < 100:
@@ -311,6 +323,10 @@ class SpaceWars:
                     if explosion.life < 1:
                         self.explosions.remove(explosion)
 
+                for item in self.overlays:
+                    if item.life <= 0:
+                        self.overlays.remove(item)
+
                 # DRAW OBJECTS
                 self.window.fill (BLACK)
                 # Draw objects
@@ -320,10 +336,12 @@ class SpaceWars:
                 self.explosions.draw(self.window)
                 self.rockets.draw(self.window)
                 self.myship.draw(self.window)
+                self.overlays.draw(self.window)
+
                 self.draw_infos()
 
                 # draw red frame and shake screen when ship has been hit
-                if time.time() > self.hit_time + 3:
+                if time.time() > self.hit_time + 1:
                     self.has_been_hit = False
                 if self.has_been_hit:
                     self.draw_has_been_hit_screen ()
@@ -514,11 +532,8 @@ class Rocket(Sprite):
         else:
             self.x_speed = -5
         self.life = 40
-        #self.image = pygame.image.load('images/fireball.png')
-        #self.image = pygame.transform.scale(self.image, (self.life, self.life))
         self.rect = pygame.Rect(x_pos, y_pos+200, self.life, self.life)
         self.image = pygame.Surface([self.life, self.life])
-
         self.image.fill(self.colors[int(self.life/10)])
 
     def update(self):
@@ -629,7 +644,29 @@ class Explosion(Sprite):
         self.y_speed *= 0.95
 
 
+class Splash(Sprite):
+    def __init__ (self, x_pos, y_pos, size):
+        super(Splash, self).__init__()
+        self.life = random.randint(30, 60)  # determines when blood
+        self.image = pygame.transform.rotate(SPLASH0, random.randint(0,360))
+        self.size = size
+        self.image = pygame.transform.scale(self.image, (self.size, self.size))
+        self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
+
+    def update(self):
+        self.life -= 1
+
+
+class Crack(Sprite):
+    def __init__(self, x_pos, y_pos):
+        super(Crack, self).__init__()
+        self.image = pygame.transform.rotate(CRACK0, random.randint(0, 360))
+        self.size = 100
+        self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
+        self.life = 100
+
+
 if __name__ == "__main__":
     # init fireworks class
-    space = SpaceWars(fps=60, init_lifes=5, enemies=5)
+    space = SpaceWars(fps=60, init_lifes=5, enemies=0)
 
