@@ -668,5 +668,5 @@ class Crack(Sprite):
 
 if __name__ == "__main__":
     # init fireworks class
-    space = SpaceWars(fps=60, init_lifes=5, enemies=0)
+    space = SpaceWars(fps=60, init_lifes=5, enemies=5)
 
