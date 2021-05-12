@@ -27,15 +27,18 @@ SPLASH0 = pygame.transform.scale(SPLASH, (100, 100))
 CRACK = pygame.image.load('images/crack.png')
 CRACK0 = pygame.transform.scale(CRACK, (100, 100))
 
+LASER = pygame.image.load('images/laser0.png')
+LASER0 = pygame.transform.scale(LASER, (100, 100))
 
 class SpaceWars:
 
-    def __init__ (self, window_title="SpaceWars", fps=60, init_lifes=3, enemies=3):
+    def __init__ (self, window_title="SpaceWars", fps=60, init_lifes=3, enemies=3, invincible=False):
         super().__init__()
 
         self.score = 0
         self.init_lifes = init_lifes
         self.lifes = init_lifes
+        self.invincible = invincible
 
         self.start_time = time.time ()
         self.anim_run = True
@@ -50,6 +53,8 @@ class SpaceWars:
         self.has_been_hit = False
         self.hit_time = 0
         self.screen_shake = False
+
+        self.warp_mode = False
 
         # Set up pygame.
         self.input_mode = 'joy'
@@ -77,7 +82,7 @@ class SpaceWars:
         self.runLoop()
 
     def init_objects(self):
-        self.enemy_counter = 0
+        #self.enemy_counter = 0
         self.init_time = time.time()
         self.anim_run = True
         self.game_over = False
@@ -107,6 +112,8 @@ class SpaceWars:
         self.explosions = pygame.sprite.Group()
 
         self.overlays = pygame.sprite.Group()
+
+        self.time_elapsed_since_last_shake = 0
 
 
     def runLoop(self):
@@ -150,6 +157,9 @@ class SpaceWars:
                             self.anim_run = False
                     if event.key == pygame.K_r:  # reload animation
                         self.init_objects()
+                    if event.key == pygame.K_w:  # reload animation
+                        if not self.warp_mode:
+                            self.init_warp_mode()
 
                     if event.key == pygame.K_KP_PLUS: # increase anim speed
                         if self.fps < 60:
@@ -191,10 +201,10 @@ class SpaceWars:
                     if self.mouse_down:
                         if event.type == pygame.JOYBUTTONUP:
                             self.rockets.add(
-                                Rocket(self.myship.rect.x, self.myship.rect.y + 75,
+                                Rocket(self.myship.rect.x-50, self.myship.rect.y + 75,
                                        self.rocket_size))
                             self.rockets.add(
-                                Rocket(self.myship.rect.x + WINDOWWIDTH/2, self.myship.rect.y + 75,
+                                Rocket(self.myship.rect.x + WINDOWWIDTH/2-50, self.myship.rect.y + 75,
                                        self.rocket_size))
                             self.rocket_size = 1
                             self.mouse_down = False
@@ -206,11 +216,10 @@ class SpaceWars:
                         # fire button
                         if event.key == pygame.K_SPACE:
                             self.rockets.add(
-                                Rocket(self.myship.rect.x,
-                                       self.myship.rect.y + WINDOWHEIGHT/2
+                                Rocket(self.myship.rect.x, WINDOWHEIGHT
                                        ))
                             self.rockets.add(
-                                Rocket(self.myship.rect.x + WINDOWWIDTH / 2, self.myship.rect.y + WINDOWHEIGHT/2
+                                Rocket(self.myship.rect.x + WINDOWWIDTH / 2, WINDOWHEIGHT
                                        ))
                             self.mouse_down = True
 
@@ -279,7 +288,7 @@ class SpaceWars:
                 # COLLISION DETECTION
                 for enemy in self.enemy_objects:
                     for rocket in self.rockets:
-                        if enemy.rect.colliderect(rocket.rect):
+                        if enemy.rect.colliderect(rocket.rect) and enemy.rect.colliderect(self.myship.inner_rect):
                             for i in range(int(enemy.size/4)):
                                 explosion = Explosion(enemy.rect.x, enemy.rect.y, enemy.color)
                                 self.explosions.add(explosion)
@@ -295,9 +304,12 @@ class SpaceWars:
                     if rocket.life < 1 or rocket.rect.y < WINDOWHEIGHT/2:
                         self.rockets.remove(rocket)
 
+                self.myship.is_locked_by_enemy = False
+
+                # MYSHIP-ENEMY collision
                 for enemy in self.enemy_objects:
                     if enemy.distance <= 0:
-                        if enemy.rect.colliderect(self.myship.rect) and not self.has_been_hit:
+                        if enemy.rect.colliderect(self.myship.rect) and not self.has_been_hit and not self.invincible:
                             self.has_been_hit = True
                             self.hit_time = time.time()
                             self.lifes -= 1
@@ -310,6 +322,7 @@ class SpaceWars:
                     if enemy.distance < 100:
                         if enemy.rect.colliderect(self.myship.rect):
                             enemy.image = pygame.transform.scale(ALIEN1, (enemy.rect.w, enemy.rect.h))
+                            self.myship.is_locked_by_enemy = True
                     if enemy.distance < -50:
                         self.enemy_objects.remove(enemy)
                         self.enemy_objects.add(EnemyObject())
@@ -335,24 +348,35 @@ class SpaceWars:
                 self.enemy_objects.draw(self.window)
                 self.explosions.draw(self.window)
                 self.rockets.draw(self.window)
-                self.myship.draw(self.window)
                 self.overlays.draw(self.window)
+                self.myship.draw(self.window)
 
                 self.draw_infos()
 
                 # draw red frame and shake screen when ship has been hit
+                # dt = self.clock.tick()
+
                 if time.time() > self.hit_time + 1:
                     self.has_been_hit = False
                 if self.has_been_hit:
-                    self.draw_has_been_hit_screen ()
+                    self.time_elapsed_since_last_shake += dt
+                    # dt is measured in milliseconds, therefore 250 ms = 0.25 seconds
+                    if self.time_elapsed_since_last_shake > 100:
+                        self.draw_has_been_hit_screen ()
 
                 # Draw the window onto the screen.
                 pygame.display.update ()
 
-                self.clock.tick (self.fps)
+                dt = self.clock.tick (self.fps)
 
         self.game_over_screen()
-        time.sleep(3)
+
+
+    def init_warp_mode(self):
+        for enemy in self.enemy_objects:
+            enemy.set_fly_by_mode(multi=2)
+        for star in self.background_stars:
+            self.background_stars.remove(star)
 
 
     def draw_has_been_hit_screen(self):
@@ -501,15 +525,19 @@ class Ship(Sprite):
         super(Ship, self).__init__()
         self.rect = pygame.Rect(int(WINDOWWIDTH / 4), int(WINDOWHEIGHT/4), WINDOWWIDTH/2, WINDOWHEIGHT/2)
         self.outer_rect = pygame.Rect(0, 0, WINDOWWIDTH, WINDOWHEIGHT)
+        self.inner_rect = pygame.Rect(int(WINDOWWIDTH / 10*4.5), int(WINDOWHEIGHT / 10*4.5), WINDOWWIDTH / 10, WINDOWHEIGHT / 10)
         self.is_vertical_breaking = True
         self.is_horizontal_breaking = True
-
+        self.is_locked_by_enemy = False
 
     def draw(self, screen):
         pygame.draw.rect(screen, WHITE, self.outer_rect, width=2)
 
         # INNER
-        pygame.draw.rect(screen, WHITE, self.rect, width=2)
+        if self.is_locked_by_enemy:
+            pygame.draw.rect(screen, RED, self.rect, width=2)
+        else:
+            pygame.draw.rect(screen, WHITE, self.rect, width=2)
 
         # FRAME
         pygame.draw.line(screen, WHITE, (0, 0),
@@ -525,63 +553,72 @@ class Ship(Sprite):
 class Rocket(Sprite):
     def __init__ (self, x_pos, y_pos):
         super(Rocket, self).__init__()
-        self.colors = colorPals["blues"]
+        #self.colors = colorPals["blues"]
         self.y_speed = 10
         if x_pos > WINDOWHEIGHT / 2:
-            self.x_speed = 5
+            self.x_speed = 7
         else:
-            self.x_speed = -5
-        self.life = 40
-        self.rect = pygame.Rect(x_pos, y_pos+200, self.life, self.life)
-        self.image = pygame.Surface([self.life, self.life])
-        self.image.fill(self.colors[int(self.life/10)])
+            self.x_speed = -7
+        self.life = 50
+        self.size = 50
+        self.rect = pygame.Rect(x_pos, y_pos, self.life, self.life)
+        #self.image = pygame.Surface([self.life, self.life])
+        #self.image.fill(self.colors[int(self.life/10)])
+        #self.image = pygame.transform.scale(self.image, (self.size, self.size))
+        self.image = pygame.transform.scale(LASER0, (self.size, self.size))
+        if x_pos < WINDOWHEIGHT/2:
+            self.image = pygame.transform.rotate(self.image, -35)
+        else:
+            self.image = pygame.transform.rotate(self.image, 35)
 
     def update(self):
+        self.life -= 1
+        self.size -= 1
+
+        # update position
         self.rect.y -= self.y_speed
         self.rect.x -= self.x_speed
 
+        #decrease laser size
+        self.rect.w, self.rect.h = self.size, self.size
+        #self.image = pygame.transform.scale(self.image, (self.size, self.size))
+
         # scale rockets as they fly away
-        if self.life > 2:
-            self.life -= 1
-        self.image = pygame.transform.scale(self.image, (self.life, self.life))
-        self.rect.w, self.rect.h = self.life, self.life
+        #self.image = pygame.transform.scale(self.image, (self.life*2, self.life*2))
 
+        """
         self.image.fill(self.colors[4-int(self.life/10)])
-
+        """
 
 class EnemyObject(Sprite):
     def __init__ (self):
         super(EnemyObject, self).__init__()
         self.color = (0,0,0)
 
-        self.size = random.randint(10,30)
+        self.size = random.randint(0,10)
 
         self.alien_img_0 = pygame.transform.scale(ALIEN0, (self.size, self.size))
         self.alien_img_1 = pygame.transform.scale(ALIEN1, (self.size, self.size))
 
         self.image = self.alien_img_0
-
-        #self.image = pygame.Surface([self.size, self.size])
         self.rect = pygame.Rect(random.randint(0, WINDOWWIDTH), random.randint(0, WINDOWHEIGHT), self.size, self.size)
 
-        self.distance = 250 #random.randint(200, 400)
+        self.distance = 300 #random.randint(200, 400)
         self.max_size = 150
-        self.step = 1
-
-        #self.explosion_count = 100
+        self.step = random.randint(1,1)
 
         # set initial speeds
         if self.rect.x > WINDOWWIDTH / 2:
-            self.x_speed = -1
+            self.x_speed = -self.step
         else:
-            self.x_speed = 1
+            self.x_speed = self.step
         if self.rect.y > WINDOWHEIGHT / 2:
-            self.y_speed = -1
+            self.y_speed = -self.step
         else:
-            self.y_speed = 1
+            self.y_speed = self.step
 
     def update(self, ship_rect, screen):
-        self.distance -= 1
+        self.distance -= self.step
 
         # update position according to x- and y-speed
         self.rect.x += self.x_speed
@@ -603,15 +640,15 @@ class EnemyObject(Sprite):
         #self.image.fill(self.color)
 
 
-    def set_fly_by_mode(self):
+    def set_fly_by_mode(self, multi=1):
         if self.rect.x > WINDOWWIDTH / 2:
-            self.x_speed = 10
+            self.x_speed = 10*multi
         else:
-            self.x_speed = -10
+            self.x_speed = -10*multi
         if self.rect.y > WINDOWHEIGHT / 2:
-            self.y_speed = 10
+            self.y_speed = 10*multi
         else:
-            self.y_speed = -10
+            self.y_speed = -10*multi
 
 
 class Explosion(Sprite):
@@ -668,5 +705,5 @@ class Crack(Sprite):
 
 if __name__ == "__main__":
     # init fireworks class
-    space = SpaceWars(fps=60, init_lifes=5, enemies=5)
+    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=True)
 
