@@ -225,7 +225,7 @@ class SpaceWars:
 
                         # fly control
                         if event.key == pygame.K_RIGHT:
-                            x_val = -1
+                            x_val = -2
                             for star in self.background_stars:
                                 star.x_speed = x_val * 3
 
@@ -234,7 +234,7 @@ class SpaceWars:
 
                             self.myship.is_horizontal_breaking = False
                         elif event.key == pygame.K_LEFT:
-                            x_val = 1
+                            x_val = 2
                             for star in self.background_stars:
                                 star.x_speed = x_val * 3
                             for star in self.enemy_objects:
@@ -243,14 +243,14 @@ class SpaceWars:
                             self.myship.is_horizontal_breaking = False
 
                         if event.key == pygame.K_UP:
-                            y_val = -1
+                            y_val = -2
                             for star in self.background_stars:
                                 star.y_speed = y_val * 3
                             for star in self.enemy_objects:
                                 star.y_speed = y_val * 3
                             self.myship.is_vertical_breaking = False
                         elif event.key == pygame.K_DOWN:
-                            y_val = 1
+                            y_val = 2
                             for star in self.background_stars:
                                 star.y_speed = y_val * 3
                             for star in self.enemy_objects:
@@ -705,5 +705,5 @@ class Crack(Sprite):
 
 if __name__ == "__main__":
     # init fireworks class
-    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=True)
+    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
 
